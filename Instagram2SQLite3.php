@@ -86,7 +86,7 @@ echo "Finished!\n";
 echo 'Add count: ' . count($posts) . "\n";
 
 function getUserId($username){
-    $html = file_get_contents(BASE_URL . "/${username}");
+    $html = safeFileGet(BASE_URL . "/${username}");
     $json = extractJson($html);
     return $json['entry_data']['ProfilePage']['0']['graphql']['user']['id'];
 }
@@ -98,7 +98,7 @@ function getRhxGis(){
             'header'  => 'User-Agent: ' . USER_AGENT . "\r\n"
         ))
     );
-    $html = file_get_contents(BASE_URL, false, $context);
+    $html = safeFileGet(BASE_URL, false, $context);
     $json = extractJson($html);
     return $json['rhx_gis'];
 }
@@ -124,13 +124,14 @@ function getJson($id, $count, $maxId){
         ))
     );
     $url = MEDIA_URL . urlencode($variables);
-    $content = file_get_contents($url, false, $context);
+    $content = safeFileGet($url, false, $context);
     return json_decode($content, true);
 }
 
 function saveGraphImage($username, $post){
-    $image = file_get_contents($post['display_url']);
-    $imageExt = getMediaExt($http_response_header);
+    $data = safeFileGet($post['display_url'], true);
+    $image = $data[0];
+    $imageExt = $data[1];
     $imageDate = getPostDate($post);
     $imageName = "${imageDate}.${imageExt}";
     file_put_contents("./${username}/${imageName}", $image);
@@ -138,15 +139,15 @@ function saveGraphImage($username, $post){
 }
 
 function saveGraphSidecar($username, $post){
-    $html = file_get_contents(MEDIA_LINK . $post['shortcode']);
+    $html = safeFileGet(MEDIA_LINK . $post['shortcode']);
     $json = extractJson($html);
     $edges = $json['entry_data']['PostPage']['0']['graphql']['shortcode_media']['edge_sidecar_to_children']['edges'];
     $imageCount = 1;
     $imageNames = '';
     foreach($edges as $edge){
-        sleep(1);
-        $image = file_get_contents($edge['node']['display_url']);
-        $imageExt = getMediaExt($http_response_header);
+        $data = safeFileGet($edge['node']['display_url'], true);
+        $image = $data[0];
+        $imageExt = $data[1];
         $imageDate = getPostDate($post);
         $imageName = "${imageDate}-" . $imageCount++ . ".${imageExt}";
         $imageNames .= "${imageName},";
@@ -157,25 +158,40 @@ function saveGraphSidecar($username, $post){
 }
 
 function saveGraphVideo($username, $post){
-    $html = file_get_contents(MEDIA_LINK . $post['shortcode']);
+    $html = safeFileGet(MEDIA_LINK . $post['shortcode']);
     $json = extractJson($html);
     $videoUrl = $json['entry_data']['PostPage']['0']['graphql']['shortcode_media']['video_url'];
-    $video = file_get_contents($videoUrl);
-    $videoExt = getMediaExt($http_response_header);
+    $data = safeFileGet($videoUrl, true);
+    $video = $data[0];
+    $videoExt = $data[1];
     $videoDate = getPostDate($post);
     $videoName = "${videoDate}.${videoExt}";
     file_put_contents("./${username}/${videoName}", $video);
     insertDB($username, $post, $videoName);
 }
 
-function getMediaExt($http_header){
-    for($i = 0; $i < count($http_header); $i++){
-        if(($mimeType = preg_replace('/^Content-Type: (image|video)\//', '', $http_header[$i])) !== $http_header[$i]){
-            $mediaExt = ($mimeType === 'jpeg') ? 'jpg' : $mimeType;
-            break;
+function safeFileGet($url, $includeExt = false, $context = null){
+    while(true){
+        sleep(1);
+        $data = @file_get_contents($url, false, $context);
+
+        if($data === false){
+            sleep(1);
+            continue;
+        }else{
+            if(!$includeExt){
+                return $data;
+            }
+            $fileExt = null;
+            foreach($http_response_header as $head){
+                if(($mimeType = preg_replace('/^Content-Type: (image|video)\//', '', $head)) !== $head){
+                    $fileExt = ($mimeType === 'jpeg') ? 'jpg' : $mimeType;
+                    break;
+                }
+            }
+            return array($data, $fileExt);
         }
     }
-    return $mediaExt;
 }
 
 function getPostDate($post){
