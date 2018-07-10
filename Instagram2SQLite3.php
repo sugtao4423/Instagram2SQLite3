@@ -13,12 +13,14 @@ if(!isset($username)){
     die();
 }
 
+define('USER_DIR', __DIR__ . "/${username}");
+
 $userId = getUserId($username);
-if(!file_exists("./${username}")){
-    mkdir("./${username}");
+if(!file_exists(USER_DIR)){
+    mkdir(USER_DIR);
 }
 
-$db = new SQLite3("./${username}.db");
+$db = new SQLite3(__DIR__ . "/${username}.db");
 $db->exec("CREATE TABLE IF NOT EXISTS ${username} (typename TEXT, text TEXT, shortcode TEXT, medias TEXT, timestamp INTEGER UNIQUE)");
 $lastShortcode = $db->querySingle("SELECT shortcode from ${username} ORDER BY timestamp DESC LIMIT 1");
 
@@ -64,17 +66,17 @@ foreach($posts as $p){
     switch($p['typename']){
     case 'GraphImage':
         sleep(1);
-        saveGraphImage($username, $p);
+        saveGraphImage($p);
         break;
 
     case 'GraphSidecar':
         sleep(1);
-        saveGraphSidecar($username, $p);
+        saveGraphSidecar($p);
         break;
 
     case 'GraphVideo':
         sleep(1);
-        saveGraphVideo($username, $p);
+        saveGraphVideo($p);
         break;
 
     default:
@@ -128,17 +130,17 @@ function getJson($id, $count, $maxId){
     return json_decode($content, true);
 }
 
-function saveGraphImage($username, $post){
+function saveGraphImage($post){
     $data = safeFileGet($post['display_url'], true);
     $image = $data[0];
     $imageExt = $data[1];
     $imageDate = getPostDate($post);
     $imageName = "${imageDate}.${imageExt}";
-    file_put_contents("./${username}/${imageName}", $image);
-    insertDB($username, $post, $imageName);
+    file_put_contents(USER_DIR . "/${imageName}", $image);
+    insertDB($post, $imageName);
 }
 
-function saveGraphSidecar($username, $post){
+function saveGraphSidecar($post){
     $html = safeFileGet(MEDIA_LINK . $post['shortcode']);
     $json = extractJson($html);
     $edges = $json['entry_data']['PostPage']['0']['graphql']['shortcode_media']['edge_sidecar_to_children']['edges'];
@@ -151,13 +153,13 @@ function saveGraphSidecar($username, $post){
         $imageDate = getPostDate($post);
         $imageName = "${imageDate}-" . $imageCount++ . ".${imageExt}";
         $imageNames .= "${imageName},";
-        file_put_contents("./${username}/${imageName}", $image);
+        file_put_contents(USER_DIR . "/${imageName}", $image);
     }
     $imageNames = substr($imageNames, 0, strlen($imageNames) - 1);
-    insertDB($username, $post, $imageNames);
+    insertDB($post, $imageNames);
 }
 
-function saveGraphVideo($username, $post){
+function saveGraphVideo($post){
     $html = safeFileGet(MEDIA_LINK . $post['shortcode']);
     $json = extractJson($html);
     $videoUrl = $json['entry_data']['PostPage']['0']['graphql']['shortcode_media']['video_url'];
@@ -166,8 +168,8 @@ function saveGraphVideo($username, $post){
     $videoExt = $data[1];
     $videoDate = getPostDate($post);
     $videoName = "${videoDate}.${videoExt}";
-    file_put_contents("./${username}/${videoName}", $video);
-    insertDB($username, $post, $videoName);
+    file_put_contents(USER_DIR . "/${videoName}", $video);
+    insertDB($post, $videoName);
 }
 
 function safeFileGet($url, $includeExt = false, $context = null){
@@ -198,8 +200,8 @@ function getPostDate($post){
     return date('Y-m-d H.i.s', $post['timestamp']);
 }
 
-function insertDB($username, $post, $medias){
-    global $db;
+function insertDB($post, $medias){
+    global $db, $username;
     $text = str_replace("'", "''", $post['text']);
     $exec = "INSERT INTO ${username} VALUES ('{$post['typename']}', '${text}', '{$post['shortcode']}', '${medias}', {$post['timestamp']})";
     $db->exec($exec);
