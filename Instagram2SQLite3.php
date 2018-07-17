@@ -147,7 +147,11 @@ function saveGraphSidecar($post){
     $imageCount = 1;
     $imageNames = '';
     foreach($edges as $edge){
-        $data = safeFileGet($edge['node']['display_url'], true);
+        if($edge['node']['is_video']){
+            $data = safeFileGet($edge['node']['video_url'], true);
+        }else{
+            $data = safeFileGet($edge['node']['display_url'], true);
+        }
         $image = $data[0];
         $imageExt = $data[1];
         $imageDate = getPostDate($post);
