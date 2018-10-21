@@ -21,8 +21,8 @@ if(!file_exists(USER_DIR)){
 }
 
 $db = new SQLite3(__DIR__ . "/${username}.db");
-$db->exec("CREATE TABLE IF NOT EXISTS ${username} (typename TEXT, text TEXT, shortcode TEXT, medias TEXT, timestamp INTEGER UNIQUE)");
-$lastShortcode = $db->querySingle("SELECT shortcode from ${username} ORDER BY timestamp DESC LIMIT 1");
+$db->exec("CREATE TABLE IF NOT EXISTS '${username}' (typename TEXT, text TEXT, shortcode TEXT, medias TEXT, timestamp INTEGER UNIQUE)");
+$lastShortcode = $db->querySingle("SELECT shortcode from '${username}' ORDER BY timestamp DESC LIMIT 1");
 
 $rhxgis = getRhxGis();
 
@@ -207,7 +207,7 @@ function getPostDate($post){
 function insertDB($post, $medias){
     global $db, $username;
     $text = str_replace("'", "''", $post['text']);
-    $exec = "INSERT INTO ${username} VALUES ('{$post['typename']}', '${text}', '{$post['shortcode']}', '${medias}', {$post['timestamp']})";
+    $exec = "INSERT INTO '${username}' VALUES ('{$post['typename']}', '${text}', '{$post['shortcode']}', '${medias}', {$post['timestamp']})";
     $db->exec($exec);
 }
 
