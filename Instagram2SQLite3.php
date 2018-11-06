@@ -207,8 +207,12 @@ function getPostDate(array $post): string{
 
 function insertDB(array $post, string $medias){
     global $db, $username;
-    $text = str_replace("'", "''", $post['text']);
-    $exec = "INSERT INTO '${username}' VALUES ('{$post['typename']}', '${text}', '{$post['shortcode']}', '${medias}', {$post['timestamp']})";
-    $db->exec($exec);
+    $stmt = $db->prepare("INSERT INTO '${username}' VALUES (:typename, :text, :shortcode, :medias, :timestamp)");
+    $stmt->bindValue(':typename', $post['typename'], SQLITE3_TEXT);
+    $stmt->bindValue(':text', $post['text'], SQLITE3_TEXT);
+    $stmt->bindValue(':shortcode', $post['shortcode'], SQLITE3_TEXT);
+    $stmt->bindValue(':medias', $medias, SQLITE3_TEXT);
+    $stmt->bindValue(':timestamp', $post['timestamp'], SQLITE3_INTEGER);
+    $stmt->execute();
 }
 
