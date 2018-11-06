@@ -29,6 +29,7 @@ $rhxgis = getRhxGis();
 
 $posts = [];
 $maxId = '';
+echo '0 posts done';
 while($maxId !== null){
     sleep(1);
     $json = getJson($userId, 50, $maxId);
@@ -70,6 +71,8 @@ while($maxId !== null){
         }
 
         $posts[] = $post;
+        echo "\r";
+        echo count($posts) . ' posts done';
     }
 
     if($breakFlag){
@@ -94,8 +97,7 @@ foreach($posts as $post){
     $stmt->bindValue(':timestamp', $post['timestamp'], SQLITE3_INTEGER);
     $stmt->execute();
 }
-echo "Finished!\n";
-echo 'Add count: ' . count($posts) . "\n";
+echo "\nFinished!\n";
 
 
 
