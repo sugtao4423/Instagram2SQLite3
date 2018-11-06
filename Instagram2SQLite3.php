@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 date_default_timezone_set('Asia/Tokyo');
 
 define('USER_AGENT', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.87 Safari/537.36');
@@ -87,13 +88,13 @@ foreach($posts as $p){
 echo "Finished!\n";
 echo 'Add count: ' . count($posts) . "\n";
 
-function getUserId($username){
+function getUserId(string $username): int{
     $html = safeFileGet(BASE_URL . "/${username}");
     $json = extractJson($html);
-    return $json['entry_data']['ProfilePage']['0']['graphql']['user']['id'];
+    return (int)$json['entry_data']['ProfilePage']['0']['graphql']['user']['id'];
 }
 
-function getRhxGis(){
+function getRhxGis(): string{
     $context = stream_context_create(array(
         'http' => array(
             'method'  => 'GET',
@@ -105,12 +106,12 @@ function getRhxGis(){
     return $json['rhx_gis'];
 }
 
-function extractJson($html){
+function extractJson(string $html): array{
     preg_match('|<script type="text/javascript">window._sharedData = (.*?);</script>|', $html, $m);
     return json_decode($m[1], true);
 }
 
-function getJson($id, $count, $maxId){
+function getJson(int $id, int $count, string $maxId): array{
     global $rhxgis;
     $variables = json_encode([
         'id' => (string)$id,
@@ -130,7 +131,7 @@ function getJson($id, $count, $maxId){
     return json_decode($content, true);
 }
 
-function saveGraphImage($post){
+function saveGraphImage(array $post){
     $data = safeFileGet($post['display_url'], true);
     $image = $data[0];
     $imageExt = $data[1];
@@ -140,7 +141,7 @@ function saveGraphImage($post){
     insertDB($post, $imageName);
 }
 
-function saveGraphSidecar($post){
+function saveGraphSidecar(array $post){
     $html = safeFileGet(MEDIA_LINK . $post['shortcode']);
     $json = extractJson($html);
     $edges = $json['entry_data']['PostPage']['0']['graphql']['shortcode_media']['edge_sidecar_to_children']['edges'];
@@ -163,7 +164,7 @@ function saveGraphSidecar($post){
     insertDB($post, $imageNames);
 }
 
-function saveGraphVideo($post){
+function saveGraphVideo(array $post){
     $html = safeFileGet(MEDIA_LINK . $post['shortcode']);
     $json = extractJson($html);
     $videoUrl = $json['entry_data']['PostPage']['0']['graphql']['shortcode_media']['video_url'];
@@ -176,7 +177,7 @@ function saveGraphVideo($post){
     insertDB($post, $videoName);
 }
 
-function safeFileGet($url, $includeExt = false, $context = null){
+function safeFileGet(string $url, bool $includeExt = false, $context = null){
     while(true){
         sleep(1);
         $data = @file_get_contents($url, false, $context);
@@ -200,11 +201,11 @@ function safeFileGet($url, $includeExt = false, $context = null){
     }
 }
 
-function getPostDate($post){
+function getPostDate(array $post): string{
     return date('Y-m-d H.i.s', $post['timestamp']);
 }
 
-function insertDB($post, $medias){
+function insertDB(array $post, string $medias){
     global $db, $username;
     $text = str_replace("'", "''", $post['text']);
     $exec = "INSERT INTO '${username}' VALUES ('{$post['typename']}', '${text}', '{$post['shortcode']}', '${medias}', {$post['timestamp']})";
