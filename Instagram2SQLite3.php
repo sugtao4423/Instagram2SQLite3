@@ -41,13 +41,35 @@ while($maxId !== null){
             $breakFlag = true;
             break;
         }
-        $posts[] = [
+        $post = [
             'typename' => $edge['node']['__typename'],
             'text' => $edge['node']['edge_media_to_caption']['edges']['0']['node']['text'],
             'shortcode' => $edge['node']['shortcode'],
             'display_url' => $edge['node']['display_url'],
             'timestamp' => $edge['node']['taken_at_timestamp']
         ];
+        switch($post['typename']){
+        case 'GraphImage':
+            sleep(1);
+            $post = saveGraphImage($post);
+            break;
+
+        case 'GraphSidecar':
+            sleep(1);
+            $post = saveGraphSidecar($post);
+            break;
+
+        case 'GraphVideo':
+            sleep(1);
+            $post = saveGraphVideo($post);
+            break;
+
+        default:
+            echo "Unknown post\n";
+            echo "Shortcode: {$post['shortcode']}";
+        }
+
+        $posts[] = $post;
     }
 
     if($breakFlag){
@@ -63,30 +85,19 @@ while($maxId !== null){
 }
 
 $posts = array_reverse($posts);
-foreach($posts as $p){
-    switch($p['typename']){
-    case 'GraphImage':
-        sleep(1);
-        saveGraphImage($p);
-        break;
-
-    case 'GraphSidecar':
-        sleep(1);
-        saveGraphSidecar($p);
-        break;
-
-    case 'GraphVideo':
-        sleep(1);
-        saveGraphVideo($p);
-        break;
-
-    default:
-        echo "Unknown post\n";
-        echo "Shortcode: {$p['shortcode']}";
-    }
+foreach($posts as $post){
+    $stmt = $db->prepare("INSERT INTO '${username}' VALUES (:typename, :text, :shortcode, :medias, :timestamp)");
+    $stmt->bindValue(':typename', $post['typename'], SQLITE3_TEXT);
+    $stmt->bindValue(':text', $post['text'], SQLITE3_TEXT);
+    $stmt->bindValue(':shortcode', $post['shortcode'], SQLITE3_TEXT);
+    $stmt->bindValue(':medias', $post['medias'], SQLITE3_TEXT);
+    $stmt->bindValue(':timestamp', $post['timestamp'], SQLITE3_INTEGER);
+    $stmt->execute();
 }
 echo "Finished!\n";
 echo 'Add count: ' . count($posts) . "\n";
+
+
 
 function getUserId(string $username): int{
     $html = safeFileGet(BASE_URL . "/${username}");
@@ -131,17 +142,18 @@ function getJson(int $id, int $count, string $maxId): array{
     return json_decode($content, true);
 }
 
-function saveGraphImage(array $post){
+function saveGraphImage(array $post): array{
     $data = safeFileGet($post['display_url'], true);
     $image = $data[0];
     $imageExt = $data[1];
     $imageDate = getPostDate($post);
     $imageName = "${imageDate}.${imageExt}";
     file_put_contents(USER_DIR . "/${imageName}", $image);
-    insertDB($post, $imageName);
+    $post['medias'] = $imageName;
+    return $post;
 }
 
-function saveGraphSidecar(array $post){
+function saveGraphSidecar(array $post): array{
     $html = safeFileGet(MEDIA_LINK . $post['shortcode']);
     $json = extractJson($html);
     $edges = $json['entry_data']['PostPage']['0']['graphql']['shortcode_media']['edge_sidecar_to_children']['edges'];
@@ -161,10 +173,11 @@ function saveGraphSidecar(array $post){
         file_put_contents(USER_DIR . "/${imageName}", $image);
     }
     $imageNames = substr($imageNames, 0, strlen($imageNames) - 1);
-    insertDB($post, $imageNames);
+    $post['medias'] = $imageNames;
+    return $post;
 }
 
-function saveGraphVideo(array $post){
+function saveGraphVideo(array $post): array{
     $html = safeFileGet(MEDIA_LINK . $post['shortcode']);
     $json = extractJson($html);
     $videoUrl = $json['entry_data']['PostPage']['0']['graphql']['shortcode_media']['video_url'];
@@ -174,7 +187,8 @@ function saveGraphVideo(array $post){
     $videoDate = getPostDate($post);
     $videoName = "${videoDate}.${videoExt}";
     file_put_contents(USER_DIR . "/${videoName}", $video);
-    insertDB($post, $videoName);
+    $post['medias'] = $videoName;
+    return $post;
 }
 
 function safeFileGet(string $url, bool $includeExt = false, $context = null){
@@ -203,16 +217,5 @@ function safeFileGet(string $url, bool $includeExt = false, $context = null){
 
 function getPostDate(array $post): string{
     return date('Y-m-d H.i.s', $post['timestamp']);
-}
-
-function insertDB(array $post, string $medias){
-    global $db, $username;
-    $stmt = $db->prepare("INSERT INTO '${username}' VALUES (:typename, :text, :shortcode, :medias, :timestamp)");
-    $stmt->bindValue(':typename', $post['typename'], SQLITE3_TEXT);
-    $stmt->bindValue(':text', $post['text'], SQLITE3_TEXT);
-    $stmt->bindValue(':shortcode', $post['shortcode'], SQLITE3_TEXT);
-    $stmt->bindValue(':medias', $medias, SQLITE3_TEXT);
-    $stmt->bindValue(':timestamp', $post['timestamp'], SQLITE3_INTEGER);
-    $stmt->execute();
 }
 
