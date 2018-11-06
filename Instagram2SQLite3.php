@@ -27,7 +27,7 @@ $lastShortcode = $db->querySingle("SELECT shortcode from '${username}' ORDER BY 
 
 $rhxgis = getRhxGis();
 
-$posts = array();
+$posts = [];
 $maxId = '';
 while($maxId !== null){
     sleep(1);
@@ -41,13 +41,13 @@ while($maxId !== null){
             $breakFlag = true;
             break;
         }
-        array_push($posts, array(
+        $posts[] = [
             'typename' => $edge['node']['__typename'],
             'text' => $edge['node']['edge_media_to_caption']['edges']['0']['node']['text'],
             'shortcode' => $edge['node']['shortcode'],
             'display_url' => $edge['node']['display_url'],
             'timestamp' => $edge['node']['taken_at_timestamp']
-        ));
+        ];
     }
 
     if($breakFlag){
@@ -95,12 +95,12 @@ function getUserId(string $username): int{
 }
 
 function getRhxGis(): string{
-    $context = stream_context_create(array(
-        'http' => array(
+    $context = stream_context_create([
+        'http' => [
             'method'  => 'GET',
             'header'  => 'User-Agent: ' . USER_AGENT . "\r\n"
-        ))
-    );
+        ]
+    ]);
     $html = safeFileGet(BASE_URL, false, $context);
     $json = extractJson($html);
     return $json['rhx_gis'];
@@ -118,14 +118,14 @@ function getJson(int $id, int $count, string $maxId): array{
         'first' => (string)$count,
         'after' => (string)$maxId
     ]);
-    $context = stream_context_create(array(
-        'http' => array(
+    $context = stream_context_create([
+        'http' => [
             'method'  => 'GET',
             'header'  =>
                 'User-Agent: ' . USER_AGENT . "\r\n" .
                 'x-instagram-gis: ' . md5(implode(':', [$rhxgis, $variables])) . "\r\n"
-        ))
-    );
+        ]
+    ]);
     $url = MEDIA_URL . urlencode($variables);
     $content = safeFileGet($url, false, $context);
     return json_decode($content, true);
@@ -196,7 +196,7 @@ function safeFileGet(string $url, bool $includeExt = false, $context = null){
                     break;
                 }
             }
-            return array($data, $fileExt);
+            return [$data, $fileExt];
         }
     }
 }
