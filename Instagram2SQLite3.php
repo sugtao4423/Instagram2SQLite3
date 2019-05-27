@@ -25,8 +25,6 @@ $db = new SQLite3(__DIR__ . "/${username}.db");
 $db->exec("CREATE TABLE IF NOT EXISTS '${username}' (typename TEXT, text TEXT, shortcode TEXT, medias TEXT, timestamp INTEGER UNIQUE)");
 $lastShortcode = $db->querySingle("SELECT shortcode from '${username}' ORDER BY timestamp DESC LIMIT 1");
 
-$rhxgis = getRhxGis();
-
 $posts = [];
 $maxId = '';
 echo '0 posts done';
@@ -107,25 +105,12 @@ function getUserId(string $username): int{
     return (int)$json['entry_data']['ProfilePage']['0']['graphql']['user']['id'];
 }
 
-function getRhxGis(): string{
-    $context = stream_context_create([
-        'http' => [
-            'method'  => 'GET',
-            'header'  => 'User-Agent: ' . USER_AGENT . "\r\n"
-        ]
-    ]);
-    $html = safeFileGet(BASE_URL, false, $context);
-    $json = extractJson($html);
-    return $json['rhx_gis'];
-}
-
 function extractJson(string $html): array{
     preg_match('|<script type="text/javascript">window._sharedData = (.*?);</script>|', $html, $m);
     return json_decode($m[1], true);
 }
 
 function getJson(int $id, int $count, string $maxId): array{
-    global $rhxgis;
     $variables = json_encode([
         'id' => (string)$id,
         'first' => (string)$count,
@@ -134,9 +119,7 @@ function getJson(int $id, int $count, string $maxId): array{
     $context = stream_context_create([
         'http' => [
             'method'  => 'GET',
-            'header'  =>
-                'User-Agent: ' . USER_AGENT . "\r\n" .
-                'x-instagram-gis: ' . md5(implode(':', [$rhxgis, $variables])) . "\r\n"
+            'header'  => 'User-Agent: ' . USER_AGENT . "\r\n"
         ]
     ]);
     $url = MEDIA_URL . urlencode($variables);
