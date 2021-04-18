@@ -109,13 +109,9 @@ echo "\nFinished!\n";
 
 function getUserId(string $username): int{
     $html = safeFileGet(BASE_URL . "/${username}");
-    $json = extractJson($html);
-    return (int)$json['entry_data']['ProfilePage']['0']['graphql']['user']['id'];
-}
-
-function extractJson(string $html): array{
     preg_match('|<script type="text/javascript">window._sharedData = (.*?);</script>|', $html, $m);
-    return json_decode($m[1], true);
+    $json = json_decode($m[1], true);
+    return (int)$json['entry_data']['ProfilePage']['0']['graphql']['user']['id'];
 }
 
 function getJson(int $id, int $count, string $maxId): array{
@@ -140,10 +136,15 @@ function saveGraphImage(array $post): array{
     return $post;
 }
 
+function extractAdditionalJson(string $html): array{
+    preg_match('|<script type="text/javascript">window.__additionalDataLoaded\(.+?,(.+?)\);</script>|', $html, $m);
+    return json_decode($m[1], true);
+}
+
 function saveGraphSidecar(array $post): array{
     $html = safeFileGet(MEDIA_LINK . $post['shortcode']);
-    $json = extractJson($html);
-    $edges = $json['entry_data']['PostPage']['0']['graphql']['shortcode_media']['edge_sidecar_to_children']['edges'];
+    $json = extractAdditionalJson($html);
+    $edges = $json['graphql']['shortcode_media']['edge_sidecar_to_children']['edges'];
     $imageCount = 1;
     $imageNames = '';
     foreach($edges as $edge){
@@ -166,8 +167,8 @@ function saveGraphSidecar(array $post): array{
 
 function saveGraphVideo(array $post): array{
     $html = safeFileGet(MEDIA_LINK . $post['shortcode']);
-    $json = extractJson($html);
-    $videoUrl = $json['entry_data']['PostPage']['0']['graphql']['shortcode_media']['video_url'];
+    $json = extractAdditionalJson($html);
+    $videoUrl = $json['graphql']['shortcode_media']['video_url'];
     $data = safeFileGet($videoUrl, true);
     $video = $data[0];
     $videoExt = $data[1];
