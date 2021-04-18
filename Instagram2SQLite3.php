@@ -4,7 +4,7 @@ date_default_timezone_set('Asia/Tokyo');
 
 define('USER_AGENT', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.72 Safari/537.36');
 define('BASE_URL', 'https://www.instagram.com');
-define('MEDIA_URL', 'https://www.instagram.com/graphql/query/?query_hash=42323d64886122307be10013ad2dcc44&variables=');
+define('MEDIA_URL', 'https://www.instagram.com/graphql/query/?query_hash=42d2750e44dbac713ff30130659cd891&variables=');
 define('MEDIA_LINK', 'https://www.instagram.com/p/');
 
 $username = $argv[1];
