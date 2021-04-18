@@ -7,12 +7,20 @@ define('BASE_URL', 'https://www.instagram.com');
 define('MEDIA_URL', 'https://www.instagram.com/graphql/query/?query_hash=42d2750e44dbac713ff30130659cd891&variables=');
 define('MEDIA_LINK', 'https://www.instagram.com/p/');
 
-$username = $argv[1];
+$username = @$argv[1];
 if(!isset($username)){
     echo "Please set username\n";
-    echo "php {$argv[0]} USERNAME\n";
-    die();
+    echo "php {$argv[0]} USERNAME SESSION_ID\n";
+    exit(1);
 }
+
+$sessionId = @$argv[2];
+if(!isset($sessionId)){
+    echo "Please set your session id\n";
+    echo "php {$argv[0]} '${username}' SESSION_ID\n";
+    exit(1);
+}
+define('SESSION_ID', $sessionId);
 
 define('USER_DIR', __DIR__ . "/${username}");
 
@@ -116,14 +124,8 @@ function getJson(int $id, int $count, string $maxId): array{
         'first' => (string)$count,
         'after' => (string)$maxId
     ]);
-    $context = stream_context_create([
-        'http' => [
-            'method'  => 'GET',
-            'header'  => 'User-Agent: ' . USER_AGENT . "\r\n"
-        ]
-    ]);
     $url = MEDIA_URL . urlencode($variables);
-    $content = safeFileGet($url, false, $context);
+    $content = safeFileGet($url, false);
     return json_decode($content, true);
 }
 
@@ -176,9 +178,16 @@ function saveGraphVideo(array $post): array{
     return $post;
 }
 
-function safeFileGet(string $url, bool $includeExt = false, $context = null){
+function safeFileGet(string $url, bool $includeExt = false){
     while(true){
         sleep(1);
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'header' => 'User-Agent: ' . USER_AGENT . "\r\n" .
+                            'Cookie: ds_user_id=; sessionid=' . SESSION_ID . "\r\n"
+            ]
+        ]);
         $data = @file_get_contents($url, false, $context);
 
         if($data === false){
