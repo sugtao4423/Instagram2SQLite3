@@ -152,14 +152,14 @@ function saveGraphSidecar(array $post): array
 {
     $html = safeFileGet(MEDIA_LINK . $post['shortcode']);
     $json = extractAdditionalJson($html);
-    $edges = $json['graphql']['shortcode_media']['edge_sidecar_to_children']['edges'];
+    $medias = $json['items']['0']['carousel_media'];
     $imageCount = 1;
     $imageNames = '';
-    foreach ($edges as $edge) {
-        if ($edge['node']['is_video']) {
-            $data = safeFileGet($edge['node']['video_url'], true);
+    foreach ($medias as $media) {
+        if (isset($media['video_versions'])) {
+            $data = safeFileGet($media['video_versions']['0']['url'], true);
         } else {
-            $data = safeFileGet($edge['node']['display_url'], true);
+            $data = safeFileGet($media['image_versions2']['candidates']['0']['url'], true);
         }
         $image = $data[0];
         $imageExt = $data[1];
