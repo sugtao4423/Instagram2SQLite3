@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 date_default_timezone_set('Asia/Tokyo');
 
@@ -8,14 +9,14 @@ define('MEDIA_URL', 'https://www.instagram.com/graphql/query/?query_hash=42d2750
 define('MEDIA_LINK', 'https://www.instagram.com/p/');
 
 $username = @$argv[1];
-if(!isset($username)){
+if (!isset($username)) {
     echo "Please set username\n";
     echo "php {$argv[0]} USERNAME SESSION_ID\n";
     exit(1);
 }
 
 $sessionId = @$argv[2];
-if(!isset($sessionId)){
+if (!isset($sessionId)) {
     echo "Please set your session id\n";
     echo "php {$argv[0]} '${username}' SESSION_ID\n";
     exit(1);
@@ -25,7 +26,7 @@ define('SESSION_ID', $sessionId);
 define('USER_DIR', __DIR__ . "/${username}");
 
 $userId = getUserId($username);
-if(!file_exists(USER_DIR)){
+if (!file_exists(USER_DIR)) {
     mkdir(USER_DIR);
 }
 
@@ -36,15 +37,15 @@ $lastShortcode = $db->querySingle("SELECT shortcode from '${username}' ORDER BY 
 $posts = [];
 $maxId = '';
 echo '0 posts done';
-while($maxId !== null){
+while ($maxId !== null) {
     sleep(1);
     $json = getJson($userId, 50, $maxId);
 
     $breakFlag = false;
 
     $edges = $json['data']['user']['edge_owner_to_timeline_media']['edges'];
-    foreach($edges as $edge){
-        if($lastShortcode == $edge['node']['shortcode']){
+    foreach ($edges as $edge) {
+        if ($lastShortcode == $edge['node']['shortcode']) {
             $breakFlag = true;
             break;
         }
@@ -55,25 +56,25 @@ while($maxId !== null){
             'display_url' => $edge['node']['display_url'],
             'timestamp' => $edge['node']['taken_at_timestamp']
         ];
-        switch($post['typename']){
-        case 'GraphImage':
-            sleep(1);
-            $post = saveGraphImage($post);
-            break;
+        switch ($post['typename']) {
+            case 'GraphImage':
+                sleep(1);
+                $post = saveGraphImage($post);
+                break;
 
-        case 'GraphSidecar':
-            sleep(1);
-            $post = saveGraphSidecar($post);
-            break;
+            case 'GraphSidecar':
+                sleep(1);
+                $post = saveGraphSidecar($post);
+                break;
 
-        case 'GraphVideo':
-            sleep(1);
-            $post = saveGraphVideo($post);
-            break;
+            case 'GraphVideo':
+                sleep(1);
+                $post = saveGraphVideo($post);
+                break;
 
-        default:
-            echo "Unknown post\n";
-            echo "Shortcode: {$post['shortcode']}";
+            default:
+                echo "Unknown post\n";
+                echo "Shortcode: {$post['shortcode']}";
         }
 
         $posts[] = $post;
@@ -81,20 +82,20 @@ while($maxId !== null){
         echo count($posts) . ' posts done';
     }
 
-    if($breakFlag){
+    if ($breakFlag) {
         break;
     }
 
     $hasNextPage = $json['data']['user']['edge_owner_to_timeline_media']['page_info']['has_next_page'];
-    if($hasNextPage){
+    if ($hasNextPage) {
         $maxId = $json['data']['user']['edge_owner_to_timeline_media']['page_info']['end_cursor'];
-    }else{
+    } else {
         $maxId = null;
     }
 }
 
 $posts = array_reverse($posts);
-foreach($posts as $post){
+foreach ($posts as $post) {
     $stmt = $db->prepare("INSERT INTO '${username}' VALUES (:typename, :text, :shortcode, :medias, :timestamp)");
     $stmt->bindValue(':typename', $post['typename'], SQLITE3_TEXT);
     $stmt->bindValue(':text', $post['text'], SQLITE3_TEXT);
@@ -107,14 +108,16 @@ echo "\nFinished!\n";
 
 
 
-function getUserId(string $username): int{
+function getUserId(string $username): int
+{
     $html = safeFileGet(BASE_URL . "/${username}");
     preg_match('|<script type="text/javascript">window._sharedData = (.*?);</script>|', $html, $m);
     $json = json_decode($m[1], true);
     return (int)$json['entry_data']['ProfilePage']['0']['graphql']['user']['id'];
 }
 
-function getJson(int $id, int $count, string $maxId): array{
+function getJson(int $id, int $count, string $maxId): array
+{
     $variables = json_encode([
         'id' => (string)$id,
         'first' => (string)$count,
@@ -125,7 +128,8 @@ function getJson(int $id, int $count, string $maxId): array{
     return json_decode($content, true);
 }
 
-function saveGraphImage(array $post): array{
+function saveGraphImage(array $post): array
+{
     $data = safeFileGet($post['display_url'], true);
     $image = $data[0];
     $imageExt = $data[1];
@@ -136,21 +140,23 @@ function saveGraphImage(array $post): array{
     return $post;
 }
 
-function extractAdditionalJson(string $html): array{
+function extractAdditionalJson(string $html): array
+{
     preg_match('|<script type="text/javascript">window.__additionalDataLoaded\(.+?,(.+?)\);</script>|', $html, $m);
     return json_decode($m[1], true);
 }
 
-function saveGraphSidecar(array $post): array{
+function saveGraphSidecar(array $post): array
+{
     $html = safeFileGet(MEDIA_LINK . $post['shortcode']);
     $json = extractAdditionalJson($html);
     $edges = $json['graphql']['shortcode_media']['edge_sidecar_to_children']['edges'];
     $imageCount = 1;
     $imageNames = '';
-    foreach($edges as $edge){
-        if($edge['node']['is_video']){
+    foreach ($edges as $edge) {
+        if ($edge['node']['is_video']) {
             $data = safeFileGet($edge['node']['video_url'], true);
-        }else{
+        } else {
             $data = safeFileGet($edge['node']['display_url'], true);
         }
         $image = $data[0];
@@ -165,7 +171,8 @@ function saveGraphSidecar(array $post): array{
     return $post;
 }
 
-function saveGraphVideo(array $post): array{
+function saveGraphVideo(array $post): array
+{
     $html = safeFileGet(MEDIA_LINK . $post['shortcode']);
     $json = extractAdditionalJson($html);
     $videoUrl = $json['graphql']['shortcode_media']['video_url'];
@@ -179,28 +186,29 @@ function saveGraphVideo(array $post): array{
     return $post;
 }
 
-function safeFileGet(string $url, bool $includeExt = false){
-    while(true){
+function safeFileGet(string $url, bool $includeExt = false)
+{
+    while (true) {
         sleep(1);
         $context = stream_context_create([
             'http' => [
                 'method' => 'GET',
                 'header' => 'User-Agent: ' . USER_AGENT . "\r\n" .
-                            'Cookie: ds_user_id=; sessionid=' . SESSION_ID . "\r\n"
+                    'Cookie: ds_user_id=; sessionid=' . SESSION_ID . "\r\n"
             ]
         ]);
         $data = @file_get_contents($url, false, $context);
 
-        if($data === false){
+        if ($data === false) {
             sleep(1);
             continue;
-        }else{
-            if(!$includeExt){
+        } else {
+            if (!$includeExt) {
                 return $data;
             }
             $fileExt = null;
-            foreach($http_response_header as $head){
-                if(($mimeType = preg_replace('/^Content-Type: (image|video)\//', '', $head)) !== $head){
+            foreach ($http_response_header as $head) {
+                if (($mimeType = preg_replace('/^Content-Type: (image|video)\//', '', $head)) !== $head) {
                     $fileExt = ($mimeType === 'jpeg') ? 'jpg' : $mimeType;
                     break;
                 }
@@ -210,7 +218,7 @@ function safeFileGet(string $url, bool $includeExt = false){
     }
 }
 
-function getPostDate(array $post): string{
+function getPostDate(array $post): string
+{
     return date('Y-m-d H.i.s', $post['timestamp']);
 }
-
