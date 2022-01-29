@@ -54,12 +54,13 @@ while ($maxId !== null) {
             'text' => $edge['node']['edge_media_to_caption']['edges']['0']['node']['text'],
             'shortcode' => $edge['node']['shortcode'],
             'display_url' => $edge['node']['display_url'],
+            'video_url' => $edge['node']['video_url'] ?? '',
             'timestamp' => $edge['node']['taken_at_timestamp']
         ];
         switch ($post['typename']) {
             case 'GraphImage':
                 sleep(1);
-                $post = saveGraphImage($post);
+                $post = saveGraphImageVideo($post, false);
                 break;
 
             case 'GraphSidecar':
@@ -69,7 +70,7 @@ while ($maxId !== null) {
 
             case 'GraphVideo':
                 sleep(1);
-                $post = saveGraphVideo($post);
+                $post = saveGraphImageVideo($post, true);
                 break;
 
             default:
@@ -128,15 +129,16 @@ function getJson(int $id, int $count, string $maxId): array
     return json_decode($content, true);
 }
 
-function saveGraphImage(array $post): array
+function saveGraphImageVideo(array $post, bool $isVideo): array
 {
-    $data = safeFileGet($post['display_url'], true);
-    $image = $data[0];
-    $imageExt = $data[1];
-    $imageDate = getPostDate($post);
-    $imageName = "${imageDate}.${imageExt}";
-    file_put_contents(USER_DIR . "/${imageName}", $image);
-    $post['medias'] = $imageName;
+    $url = $isVideo ? $post['video_url'] : $post['display_url'];
+    $data = safeFileGet($url, true);
+    $file = $data[0];
+    $fileExt = $data[1];
+    $fileDate = getPostDate($post);
+    $fileName = "${fileDate}.${fileExt}";
+    file_put_contents(USER_DIR . "/${fileName}", $file);
+    $post['medias'] = $fileName;
     return $post;
 }
 
@@ -168,21 +170,6 @@ function saveGraphSidecar(array $post): array
     }
     $imageNames = substr($imageNames, 0, strlen($imageNames) - 1);
     $post['medias'] = $imageNames;
-    return $post;
-}
-
-function saveGraphVideo(array $post): array
-{
-    $html = safeFileGet(MEDIA_LINK . $post['shortcode']);
-    $json = extractAdditionalJson($html);
-    $videoUrl = $json['graphql']['shortcode_media']['video_url'];
-    $data = safeFileGet($videoUrl, true);
-    $video = $data[0];
-    $videoExt = $data[1];
-    $videoDate = getPostDate($post);
-    $videoName = "${videoDate}.${videoExt}";
-    file_put_contents(USER_DIR . "/${videoName}", $video);
-    $post['medias'] = $videoName;
     return $post;
 }
 
