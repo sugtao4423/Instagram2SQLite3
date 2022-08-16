@@ -3,10 +3,10 @@
 declare(strict_types=1);
 date_default_timezone_set('Asia/Tokyo');
 
-define('USER_AGENT', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.72 Safari/537.36');
-define('BASE_URL', 'https://www.instagram.com');
-define('MEDIA_URL', 'https://www.instagram.com/graphql/query/?query_hash=42d2750e44dbac713ff30130659cd891&variables=');
-define('MEDIA_LINK', 'https://www.instagram.com/p/');
+define('USER_AGENT', 'Instagram 247.0.0.17.113 Android');
+define('API_BASE_URL', 'https://i.instagram.com/api/v1');
+define('GRAPHQL_QUERY_URL', 'https://www.instagram.com/graphql/query');
+define('QUERY_HASH', '69cba40317214236af40e7efa697781d');
 
 $username = @$argv[1];
 if (!isset($username)) {
@@ -54,23 +54,20 @@ while ($maxId !== null) {
             'text' => $edge['node']['edge_media_to_caption']['edges']['0']['node']['text'],
             'shortcode' => $edge['node']['shortcode'],
             'display_url' => $edge['node']['display_url'],
-            'video_url' => $edge['node']['video_url'] ?? '',
+            'video_url' => $edge['node']['video_url'] ?? null,
+            'sidecar_edges' => $edge['node']['edge_sidecar_to_children']['edges'] ?? null,
             'timestamp' => $edge['node']['taken_at_timestamp']
         ];
         switch ($post['typename']) {
             case 'GraphImage':
+            case 'GraphVideo':
                 sleep(1);
-                $post = saveGraphImageVideo($post, false);
+                $post = saveGraphImageOrVideo($post);
                 break;
 
             case 'GraphSidecar':
                 sleep(1);
                 $post = saveGraphSidecar($post);
-                break;
-
-            case 'GraphVideo':
-                sleep(1);
-                $post = saveGraphImageVideo($post, true);
                 break;
 
             default:
@@ -111,10 +108,10 @@ echo "\nFinished!\n";
 
 function getUserId(string $username): int
 {
-    $html = safeFileGet(BASE_URL . "/${username}");
-    preg_match('|<script type="text/javascript">window._sharedData = (.*?);</script>|', $html, $m);
-    $json = json_decode($m[1], true);
-    return (int)$json['entry_data']['ProfilePage']['0']['graphql']['user']['id'];
+    $url = API_BASE_URL . '/users/web_profile_info/?username=' . urlencode($username);
+    $response = safeFileGet($url);
+    $json = json_decode($response, true);
+    return (int)$json['data']['user']['id'];
 }
 
 function getJson(int $id, int $count, string $maxId): array
@@ -124,13 +121,14 @@ function getJson(int $id, int $count, string $maxId): array
         'first' => (string)$count,
         'after' => (string)$maxId
     ]);
-    $url = MEDIA_URL . urlencode($variables);
-    $content = safeFileGet($url, false);
+    $url = GRAPHQL_QUERY_URL . '/?query_hash=' . QUERY_HASH . '&variables=' . urlencode($variables);
+    $content = safeFileGet($url);
     return json_decode($content, true);
 }
 
-function saveGraphImageVideo(array $post, bool $isVideo): array
+function saveGraphImageOrVideo(array $post): array
 {
+    $isVideo = $post['video_url'] !== null;
     $url = $isVideo ? $post['video_url'] : $post['display_url'];
     $data = safeFileGet($url, true);
     $file = $data[0];
@@ -142,24 +140,15 @@ function saveGraphImageVideo(array $post, bool $isVideo): array
     return $post;
 }
 
-function extractAdditionalJson(string $html): array
-{
-    preg_match('|<script type="text/javascript">window.__additionalDataLoaded\(.+?,(.+?)\);</script>|', $html, $m);
-    return json_decode($m[1], true);
-}
-
 function saveGraphSidecar(array $post): array
 {
-    $html = safeFileGet(MEDIA_LINK . $post['shortcode']);
-    $json = extractAdditionalJson($html);
-    $medias = $json['items']['0']['carousel_media'];
     $imageCount = 1;
     $imageNames = '';
-    foreach ($medias as $media) {
-        if (isset($media['video_versions'])) {
-            $data = safeFileGet($media['video_versions']['0']['url'], true);
+    foreach ($post['sidecar_edges'] as $edge) {
+        if ($edge['node']['is_video']) {
+            $data = safeFileGet($edge['node']['video_url'], true);
         } else {
-            $data = safeFileGet($media['image_versions2']['candidates']['0']['url'], true);
+            $data = safeFileGet($edge['node']['display_url'], true);
         }
         $image = $data[0];
         $imageExt = $data[1];
@@ -181,7 +170,7 @@ function safeFileGet(string $url, bool $includeExt = false)
             'http' => [
                 'method' => 'GET',
                 'header' => 'User-Agent: ' . USER_AGENT . "\r\n" .
-                    'Cookie: ds_user_id=; sessionid=' . SESSION_ID . "\r\n"
+                    'Cookie: sessionid=' . SESSION_ID . "\r\n"
             ]
         ]);
         $data = @file_get_contents($url, false, $context);
