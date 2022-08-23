@@ -123,35 +123,29 @@ function saveGraphImageOrVideo(array $post): array
 {
     $isVideo = $post['video_url'] !== null;
     $url = $isVideo ? $post['video_url'] : $post['display_url'];
-    $data = getMediaFile($url);
-    $file = $data[0];
-    $fileExt = $data[1];
-    $fileDate = getPostDate($post);
-    $fileName = "${fileDate}.${fileExt}";
-    file_put_contents(USER_DIR . "/${fileName}", $file);
-    $post['medias'] = $fileName;
+    $fileName = getPostDate($post);
+    $savePath = USER_DIR . "/${fileName}";
+    $fileExt = saveMediaFile($url, $savePath);
+    $post['medias'] = $fileName . '.' . $fileExt;
     return $post;
 }
 
 function saveGraphSidecar(array $post): array
 {
     $imageCount = 1;
-    $imageNames = '';
+    $imageNames = [];
     foreach ($post['sidecar_edges'] as $edge) {
+        $fileName = getPostDate($post) . '-' . $imageCount++;
+        $savePath = USER_DIR . "/${fileName}";
+
         if ($edge['node']['is_video']) {
-            $data = getMediaFile($edge['node']['video_url']);
+            $fileExt = saveMediaFile($edge['node']['video_url'], $savePath);
         } else {
-            $data = getMediaFile($edge['node']['display_url']);
+            $fileExt = saveMediaFile($edge['node']['display_url'], $savePath);
         }
-        $image = $data[0];
-        $imageExt = $data[1];
-        $imageDate = getPostDate($post);
-        $imageName = "${imageDate}-" . $imageCount++ . ".${imageExt}";
-        $imageNames .= "${imageName},";
-        file_put_contents(USER_DIR . "/${imageName}", $image);
+        $imageNames[] = $fileName . '.' . $fileExt;
     }
-    $imageNames = substr($imageNames, 0, strlen($imageNames) - 1);
-    $post['medias'] = $imageNames;
+    $post['medias'] = implode(',', $imageNames);
     return $post;
 }
 
@@ -178,20 +172,29 @@ function requestGraphQL(string $url): string
     return request($url, GRAPHQL_USER_AGENT);
 }
 
-function getMediaFile(string $url): array
+/**
+ * @param string $url url of the media file
+ * @param string $savePath path to save file `eg. /tmp/file`
+ * @return string extension of file `eg. jpg`
+ */
+function saveMediaFile(string $url, string $savePath): string
 {
     $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    $fp = fopen($savePath, 'w');
+    curl_setopt($ch, CURLOPT_FILE, $fp);
     curl_setopt($ch, CURLOPT_USERAGENT, GRAPHQL_USER_AGENT);
     do {
         sleep(1);
-        $response = curl_exec($ch);
-    } while ($response === false);
+        $result = curl_exec($ch);
+    } while ($result === false);
     $mimeType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
     $ext = preg_replace('/^(image|video)\//', '', $mimeType);
     $ext = str_replace('jpeg', 'jpg', $ext);
+    fclose($fp);
     curl_close($ch);
-    return [$response, $ext];
+
+    rename($savePath, $savePath . '.' . $ext);
+    return $ext;
 }
 
 function getPostDate(array $post): string
