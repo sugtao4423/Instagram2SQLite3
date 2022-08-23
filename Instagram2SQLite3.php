@@ -3,25 +3,18 @@
 declare(strict_types=1);
 date_default_timezone_set('Asia/Tokyo');
 
-define('USER_AGENT', 'Instagram 247.0.0.17.113 Android');
+define('API_USER_AGENT', 'Instagram 247.0.0.17.113 Android');
 define('API_BASE_URL', 'https://i.instagram.com/api/v1');
+define('GRAPHQL_USER_AGENT', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36');
 define('GRAPHQL_QUERY_URL', 'https://www.instagram.com/graphql/query');
 define('QUERY_HASH', '69cba40317214236af40e7efa697781d');
 
 $username = @$argv[1];
 if (!isset($username)) {
     echo "Please set username\n";
-    echo "php {$argv[0]} USERNAME SESSION_ID\n";
+    echo "php {$argv[0]} USERNAME\n";
     exit(1);
 }
-
-$sessionId = @$argv[2];
-if (!isset($sessionId)) {
-    echo "Please set your session id\n";
-    echo "php {$argv[0]} '${username}' SESSION_ID\n";
-    exit(1);
-}
-define('SESSION_ID', $sessionId);
 
 define('USER_DIR', __DIR__ . "/${username}");
 
@@ -109,7 +102,7 @@ echo "\nFinished!\n";
 function getUserId(string $username): int
 {
     $url = API_BASE_URL . '/users/web_profile_info/?username=' . urlencode($username);
-    $response = safeFileGet($url);
+    $response = requestApi($url);
     $json = json_decode($response, true);
     return (int)$json['data']['user']['id'];
 }
@@ -122,7 +115,7 @@ function getJson(int $id, int $count, string $maxId): array
         'after' => (string)$maxId
     ]);
     $url = GRAPHQL_QUERY_URL . '/?query_hash=' . QUERY_HASH . '&variables=' . urlencode($variables);
-    $content = safeFileGet($url);
+    $content = requestGraphQL($url);
     return json_decode($content, true);
 }
 
@@ -130,7 +123,7 @@ function saveGraphImageOrVideo(array $post): array
 {
     $isVideo = $post['video_url'] !== null;
     $url = $isVideo ? $post['video_url'] : $post['display_url'];
-    $data = safeFileGet($url, true);
+    $data = getMediaFile($url);
     $file = $data[0];
     $fileExt = $data[1];
     $fileDate = getPostDate($post);
@@ -146,9 +139,9 @@ function saveGraphSidecar(array $post): array
     $imageNames = '';
     foreach ($post['sidecar_edges'] as $edge) {
         if ($edge['node']['is_video']) {
-            $data = safeFileGet($edge['node']['video_url'], true);
+            $data = getMediaFile($edge['node']['video_url']);
         } else {
-            $data = safeFileGet($edge['node']['display_url'], true);
+            $data = getMediaFile($edge['node']['display_url']);
         }
         $image = $data[0];
         $imageExt = $data[1];
@@ -162,36 +155,43 @@ function saveGraphSidecar(array $post): array
     return $post;
 }
 
-function safeFileGet(string $url, bool $includeExt = false)
+function request(string $url, string $userAgent): string
 {
-    while (true) {
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_USERAGENT, $userAgent);
+    do {
         sleep(1);
-        $context = stream_context_create([
-            'http' => [
-                'method' => 'GET',
-                'header' => 'User-Agent: ' . USER_AGENT . "\r\n" .
-                    'Cookie: sessionid=' . SESSION_ID . "\r\n"
-            ]
-        ]);
-        $data = @file_get_contents($url, false, $context);
+        $response = curl_exec($ch);
+    } while ($response === false);
+    curl_close($ch);
+    return $response;
+}
 
-        if ($data === false) {
-            sleep(1);
-            continue;
-        } else {
-            if (!$includeExt) {
-                return $data;
-            }
-            $fileExt = null;
-            foreach ($http_response_header as $head) {
-                if (($mimeType = preg_replace('/^Content-Type: (image|video)\//', '', $head)) !== $head) {
-                    $fileExt = ($mimeType === 'jpeg') ? 'jpg' : $mimeType;
-                    break;
-                }
-            }
-            return [$data, $fileExt];
-        }
-    }
+function requestApi(string $url): string
+{
+    return request($url, API_USER_AGENT);
+}
+
+function requestGraphQL(string $url): string
+{
+    return request($url, GRAPHQL_USER_AGENT);
+}
+
+function getMediaFile(string $url): array
+{
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_USERAGENT, GRAPHQL_USER_AGENT);
+    do {
+        sleep(1);
+        $response = curl_exec($ch);
+    } while ($response === false);
+    $mimeType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+    $ext = preg_replace('/^(image|video)\//', '', $mimeType);
+    $ext = str_replace('jpeg', 'jpg', $ext);
+    curl_close($ch);
+    return [$response, $ext];
 }
 
 function getPostDate(array $post): string
