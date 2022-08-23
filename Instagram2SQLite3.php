@@ -153,6 +153,7 @@ function request(string $url, string $userAgent): string
 {
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FAILONERROR, true);
     curl_setopt($ch, CURLOPT_USERAGENT, $userAgent);
     do {
         sleep(1);
@@ -182,6 +183,7 @@ function saveMediaFile(string $url, string $savePath): string
     $ch = curl_init($url);
     $fp = fopen($savePath, 'w');
     curl_setopt($ch, CURLOPT_FILE, $fp);
+    curl_setopt($ch, CURLOPT_FAILONERROR, true);
     curl_setopt($ch, CURLOPT_USERAGENT, GRAPHQL_USER_AGENT);
     do {
         sleep(1);
