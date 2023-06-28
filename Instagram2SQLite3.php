@@ -31,7 +31,6 @@ $posts = [];
 $maxId = '';
 echo '0 posts done';
 while ($maxId !== null) {
-    sleep(1);
     $json = getJson($userId, 50, $maxId);
 
     $breakFlag = false;
@@ -54,12 +53,10 @@ while ($maxId !== null) {
         switch ($post['typename']) {
             case 'GraphImage':
             case 'GraphVideo':
-                sleep(1);
                 $post = saveGraphImageOrVideo($post);
                 break;
 
             case 'GraphSidecar':
-                sleep(1);
                 $post = saveGraphSidecar($post);
                 break;
 
