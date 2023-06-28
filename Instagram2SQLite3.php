@@ -101,7 +101,12 @@ function getUserId(string $username): int
     $url = API_BASE_URL . '/users/web_profile_info/?username=' . urlencode($username);
     $response = requestApi($url);
     $json = json_decode($response, true);
-    return (int)$json['data']['user']['id'];
+    $userId = $json['data']['user']['id'] ?? null;
+    if ($userId === null || (int)$userId === 0) {
+        echo "Error: Can't get user id.\n";
+        exit(1);
+    }
+    return (int)$userId;
 }
 
 function getJson(int $id, int $count, string $maxId): array
