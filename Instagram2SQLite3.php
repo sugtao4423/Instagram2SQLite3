@@ -16,16 +16,16 @@ if (!isset($username)) {
     exit(1);
 }
 
-define('USER_DIR', __DIR__ . "/${username}");
+define('USER_DIR', __DIR__ . "/{$username}");
 
 $userId = getUserId($username);
 if (!file_exists(USER_DIR)) {
     mkdir(USER_DIR);
 }
 
-$db = new SQLite3(__DIR__ . "/${username}.db");
-$db->exec("CREATE TABLE IF NOT EXISTS '${username}' (typename TEXT, text TEXT, shortcode TEXT, medias TEXT, timestamp INTEGER UNIQUE)");
-$lastShortcode = $db->querySingle("SELECT shortcode from '${username}' ORDER BY timestamp DESC LIMIT 1");
+$db = new SQLite3(__DIR__ . "/{$username}.db");
+$db->exec("CREATE TABLE IF NOT EXISTS '{$username}' (typename TEXT, text TEXT, shortcode TEXT, medias TEXT, timestamp INTEGER UNIQUE)");
+$lastShortcode = $db->querySingle("SELECT shortcode from '{$username}' ORDER BY timestamp DESC LIMIT 1");
 
 $posts = [];
 $maxId = '';
@@ -87,7 +87,7 @@ while ($maxId !== null) {
 
 $posts = array_reverse($posts);
 foreach ($posts as $post) {
-    $stmt = $db->prepare("INSERT INTO '${username}' VALUES (:typename, :text, :shortcode, :medias, :timestamp)");
+    $stmt = $db->prepare("INSERT INTO '{$username}' VALUES (:typename, :text, :shortcode, :medias, :timestamp)");
     $stmt->bindValue(':typename', $post['typename'], SQLITE3_TEXT);
     $stmt->bindValue(':text', $post['text'], SQLITE3_TEXT);
     $stmt->bindValue(':shortcode', $post['shortcode'], SQLITE3_TEXT);
@@ -124,7 +124,7 @@ function saveGraphImageOrVideo(array $post): array
     $isVideo = $post['video_url'] !== null;
     $url = $isVideo ? $post['video_url'] : $post['display_url'];
     $fileName = getPostDate($post);
-    $savePath = USER_DIR . "/${fileName}";
+    $savePath = USER_DIR . "/{$fileName}";
     $fileExt = saveMediaFile($url, $savePath);
     $post['medias'] = $fileName . '.' . $fileExt;
     return $post;
@@ -136,7 +136,7 @@ function saveGraphSidecar(array $post): array
     $imageNames = [];
     foreach ($post['sidecar_edges'] as $edge) {
         $fileName = getPostDate($post) . '-' . $imageCount++;
-        $savePath = USER_DIR . "/${fileName}";
+        $savePath = USER_DIR . "/{$fileName}";
 
         if ($edge['node']['is_video']) {
             $fileExt = saveMediaFile($edge['node']['video_url'], $savePath);
