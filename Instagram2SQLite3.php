@@ -5,7 +5,7 @@ date_default_timezone_set('Asia/Tokyo');
 
 define('API_USER_AGENT', 'Instagram 247.0.0.17.113 Android');
 define('API_BASE_URL', 'https://i.instagram.com/api/v1');
-define('GRAPHQL_USER_AGENT', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36');
+define('GRAPHQL_USER_AGENT', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 define('GRAPHQL_QUERY_URL', 'https://www.instagram.com/graphql/query');
 define('QUERY_HASH', '69cba40317214236af40e7efa697781d');
 
