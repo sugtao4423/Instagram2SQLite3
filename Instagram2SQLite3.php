@@ -194,6 +194,8 @@ function saveMediaFile(string $url, string $savePath): string
     curl_setopt($ch, CURLOPT_FILE, $fp);
     curl_setopt($ch, CURLOPT_FAILONERROR, true);
     curl_setopt($ch, CURLOPT_USERAGENT, GRAPHQL_USER_AGENT);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
     do {
         sleep(1);
         $result = curl_exec($ch);
