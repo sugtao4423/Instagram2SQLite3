@@ -12,14 +12,16 @@ define('API_HTTP_HEADERS', [
 ]);
 define('USER_AGENT', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
 
-$options = getopt('u:', ['username:']);
+$options = getopt('u:c:', ['username:', 'cookie:']);
 $username = $options['u'] ?? $options['username'] ?? null;
 if (!isset($username)) {
     echo "Please set username\n";
-    echo "  php {$argv[0]} -u {USERNAME}\n";
-    echo "  php {$argv[0]} --username {USERNAME}\n";
+    echo "  php {$argv[0]} -u {USERNAME} [-c {COOKIE}]\n";
+    echo "  php {$argv[0]} --username {USERNAME} [--cookie {COOKIE}]\n";
     exit(1);
 }
+$cookie = $options['c'] ?? $options['cookie'] ?? null;
+define('API_COOKIE', $cookie);
 
 define('USER_DIR', __DIR__ . '/' . $username);
 
@@ -167,6 +169,9 @@ function requestApi(string $url): string
     curl_setopt($ch, CURLOPT_FAILONERROR, true);
     curl_setopt($ch, CURLOPT_USERAGENT, USER_AGENT);
     curl_setopt($ch, CURLOPT_HTTPHEADER, API_HTTP_HEADERS);
+    if (API_COOKIE !== null) {
+        curl_setopt($ch, CURLOPT_COOKIE, API_COOKIE);
+    }
     do {
         sleep(1);
         $response = curl_exec($ch);
