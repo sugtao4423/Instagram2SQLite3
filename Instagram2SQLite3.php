@@ -3,14 +3,14 @@
 declare(strict_types=1);
 date_default_timezone_set('Asia/Tokyo');
 
-define('API_BASE_URL', 'https://i.instagram.com/api/v1');
+define('API_PROFILE_URL', 'https://www.instagram.com/api/v1/users/web_profile_info/');
+define('API_QUERY_URL', 'https://www.instagram.com/graphql/query/');
+define('API_QUERY_POST_DOC_ID', '17991233890457762');
 define('API_HTTP_HEADERS', [
     'X-Asbd-Id: 129477',
     'X-Ig-App-Id: 936619743392459',
 ]);
-define('GRAPHQL_QUERY_URL', 'https://www.instagram.com/graphql/query');
-define('USER_AGENT', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-define('QUERY_HASH', '69cba40317214236af40e7efa697781d');
+define('USER_AGENT', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
 
 $options = getopt('u:', ['username:']);
 $username = $options['u'] ?? $options['username'] ?? null;
@@ -21,7 +21,7 @@ if (!isset($username)) {
     exit(1);
 }
 
-define('USER_DIR', __DIR__ . "/{$username}");
+define('USER_DIR', __DIR__ . '/' . $username);
 
 $userId = getUserId($username);
 if (!file_exists(USER_DIR)) {
@@ -36,13 +36,13 @@ $posts = [];
 $maxId = '';
 echo '0 posts done';
 while ($maxId !== null) {
-    $json = getJson($userId, 50, $maxId);
+    $json = getPosts($userId, 50, $maxId);
 
     $breakFlag = false;
 
     $edges = $json['data']['user']['edge_owner_to_timeline_media']['edges'];
     foreach ($edges as $edge) {
-        if ($lastShortcode == $edge['node']['shortcode']) {
+        if ($lastShortcode === $edge['node']['shortcode']) {
             $breakFlag = true;
             break;
         }
@@ -103,7 +103,7 @@ echo "\nFinished!\n";
 
 function getUserId(string $username): int
 {
-    $url = API_BASE_URL . '/users/web_profile_info/?username=' . urlencode($username);
+    $url = API_PROFILE_URL . '?' . http_build_query(['username' => $username]);
     $response = requestApi($url);
     $json = json_decode($response, true);
     $userId = $json['data']['user']['id'] ?? null;
@@ -114,14 +114,17 @@ function getUserId(string $username): int
     return (int)$userId;
 }
 
-function getJson(int $id, int $count, string $maxId): array
+function getPosts(int $id, int $count, string $maxId): array
 {
-    $variables = json_encode([
-        'id' => (string)$id,
-        'first' => (string)$count,
-        'after' => (string)$maxId
+    $params = http_build_query([
+        'doc_id' => API_QUERY_POST_DOC_ID,
+        'variables' => json_encode([
+            'id' => (string)$id,
+            'first' => (string)$count,
+            'after' => (string)$maxId
+        ])
     ]);
-    $url = GRAPHQL_QUERY_URL . '/?query_hash=' . QUERY_HASH . '&variables=' . urlencode($variables);
+    $url = API_QUERY_URL . '?' . $params;
     $content = requestApi($url);
     return json_decode($content, true);
 }
@@ -131,7 +134,7 @@ function saveGraphImageOrVideo(array $post): array
     $isVideo = $post['video_url'] !== null;
     $url = $isVideo ? $post['video_url'] : $post['display_url'];
     $fileName = getPostDate($post);
-    $savePath = USER_DIR . "/{$fileName}";
+    $savePath = USER_DIR . '/' . $fileName;
     $fileExt = saveMediaFile($url, $savePath);
     $post['medias'] = $fileName . '.' . $fileExt;
     return $post;
@@ -143,13 +146,10 @@ function saveGraphSidecar(array $post): array
     $imageNames = [];
     foreach ($post['sidecar_edges'] as $edge) {
         $fileName = getPostDate($post) . '-' . $imageCount++;
-        $savePath = USER_DIR . "/{$fileName}";
+        $savePath = USER_DIR . '/' . $fileName;
 
-        if ($edge['node']['is_video']) {
-            $fileExt = saveMediaFile($edge['node']['video_url'], $savePath);
-        } else {
-            $fileExt = saveMediaFile($edge['node']['display_url'], $savePath);
-        }
+        $urlKey = $edge['node']['is_video'] ? 'video_url' : 'display_url';
+        $fileExt = saveMediaFile($edge['node'][$urlKey], $savePath);
         $imageNames[] = $fileName . '.' . $fileExt;
     }
     $post['medias'] = implode(',', $imageNames);
