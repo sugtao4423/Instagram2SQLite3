@@ -3,22 +3,23 @@
 declare(strict_types=1);
 date_default_timezone_set('Asia/Tokyo');
 
-define('API_USER_AGENT', 'Instagram 247.0.0.17.113 Android');
 define('API_BASE_URL', 'https://i.instagram.com/api/v1');
-define('GRAPHQL_USER_AGENT', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+define('API_HTTP_HEADERS', [
+    'X-Asbd-Id: 129477',
+    'X-Ig-App-Id: 936619743392459',
+]);
 define('GRAPHQL_QUERY_URL', 'https://www.instagram.com/graphql/query');
+define('USER_AGENT', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 define('QUERY_HASH', '69cba40317214236af40e7efa697781d');
 
-$options = getopt('u:s:', ['username:', 'sessionId:']);
+$options = getopt('u:', ['username:']);
 $username = $options['u'] ?? $options['username'] ?? null;
-$sessionId = $options['s'] ?? $options['sessionId'] ?? null;
-if (!isset($username) || !isset($sessionId)) {
-    echo "Please set username and sessionId\n";
-    echo "  php {$argv[0]} -u {USERNAME} -s {SESSION_ID}\n";
-    echo "  php {$argv[0]} --username {USERNAME} --sessionId {SESSION_ID}\n";
+if (!isset($username)) {
+    echo "Please set username\n";
+    echo "  php {$argv[0]} -u {USERNAME}\n";
+    echo "  php {$argv[0]} --username {USERNAME}\n";
     exit(1);
 }
-define('SESSION_ID', $sessionId);
 
 define('USER_DIR', __DIR__ . "/{$username}");
 
@@ -121,7 +122,7 @@ function getJson(int $id, int $count, string $maxId): array
         'after' => (string)$maxId
     ]);
     $url = GRAPHQL_QUERY_URL . '/?query_hash=' . QUERY_HASH . '&variables=' . urlencode($variables);
-    $content = requestGraphQL($url);
+    $content = requestApi($url);
     return json_decode($content, true);
 }
 
@@ -155,31 +156,19 @@ function saveGraphSidecar(array $post): array
     return $post;
 }
 
-function request(string $url, string $userAgent): string
+function requestApi(string $url): string
 {
-    $cookie = 'ds_user_id=; sessionid=' . SESSION_ID;
-
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_FAILONERROR, true);
-    curl_setopt($ch, CURLOPT_USERAGENT, $userAgent);
-    curl_setopt($ch, CURLOPT_COOKIE, $cookie);
+    curl_setopt($ch, CURLOPT_USERAGENT, USER_AGENT);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, API_HTTP_HEADERS);
     do {
         sleep(1);
         $response = curl_exec($ch);
     } while ($response === false);
     curl_close($ch);
     return $response;
-}
-
-function requestApi(string $url): string
-{
-    return request($url, API_USER_AGENT);
-}
-
-function requestGraphQL(string $url): string
-{
-    return request($url, GRAPHQL_USER_AGENT);
 }
 
 /**
@@ -193,7 +182,7 @@ function saveMediaFile(string $url, string $savePath): string
     $fp = fopen($savePath, 'w');
     curl_setopt($ch, CURLOPT_FILE, $fp);
     curl_setopt($ch, CURLOPT_FAILONERROR, true);
-    curl_setopt($ch, CURLOPT_USERAGENT, GRAPHQL_USER_AGENT);
+    curl_setopt($ch, CURLOPT_USERAGENT, USER_AGENT);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
     curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
     do {
