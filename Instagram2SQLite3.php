@@ -28,9 +28,13 @@ if (!file_exists(USER_DIR)) {
     mkdir(USER_DIR);
 }
 
-$db = new SQLite3(__DIR__ . "/{$username}.db");
-$db->exec("CREATE TABLE IF NOT EXISTS '{$username}' (typename TEXT, text TEXT, shortcode TEXT, medias TEXT, timestamp INTEGER UNIQUE)");
-$lastShortcode = $db->querySingle("SELECT shortcode from '{$username}' ORDER BY timestamp DESC LIMIT 1");
+$dbPath = __DIR__ . "/{$username}.db";
+$pdo = new PDO('sqlite:' . $dbPath);
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$pdo->exec("CREATE TABLE IF NOT EXISTS '{$username}' (typename TEXT, text TEXT, shortcode TEXT, medias TEXT, timestamp INTEGER UNIQUE)");
+$lastShortcode = $pdo
+    ->query("SELECT shortcode from '{$username}' ORDER BY timestamp DESC LIMIT 1")
+    ->fetch(PDO::FETCH_NUM)[0] ?? null;
 
 $posts = [];
 $maxId = '';
@@ -89,12 +93,12 @@ while ($maxId !== null) {
 
 $posts = array_reverse($posts);
 foreach ($posts as $post) {
-    $stmt = $db->prepare("INSERT INTO '{$username}' VALUES (:typename, :text, :shortcode, :medias, :timestamp)");
-    $stmt->bindValue(':typename', $post['typename'], SQLITE3_TEXT);
-    $stmt->bindValue(':text', $post['text'], SQLITE3_TEXT);
-    $stmt->bindValue(':shortcode', $post['shortcode'], SQLITE3_TEXT);
-    $stmt->bindValue(':medias', $post['medias'], SQLITE3_TEXT);
-    $stmt->bindValue(':timestamp', $post['timestamp'], SQLITE3_INTEGER);
+    $stmt = $pdo->prepare("INSERT INTO '{$username}' VALUES (?, ?, ?, ?, ?)");
+    $stmt->bindValue(1, $post['typename'], PDO::PARAM_STR);
+    $stmt->bindValue(2, $post['text'], PDO::PARAM_STR);
+    $stmt->bindValue(3, $post['shortcode'], PDO::PARAM_STR);
+    $stmt->bindValue(4, $post['medias'], PDO::PARAM_STR);
+    $stmt->bindValue(5, $post['timestamp'], PDO::PARAM_INT);
     $stmt->execute();
 }
 echo "\nFinished!\n";
