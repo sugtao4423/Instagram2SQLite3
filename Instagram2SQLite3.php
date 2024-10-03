@@ -4,13 +4,8 @@ declare(strict_types=1);
 date_default_timezone_set('Asia/Tokyo');
 
 define('API_PROFILE_URL', 'https://www.instagram.com/api/v1/users/web_profile_info/');
-define('API_QUERY_URL', 'https://www.instagram.com/graphql/query/');
-define('API_QUERY_POST_DOC_ID', '17991233890457762');
-define('API_HTTP_HEADERS', [
-    'X-Asbd-Id: 129477',
-    'X-Ig-App-Id: 936619743392459',
-]);
-define('USER_AGENT', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
+define('API_QUERY_URL', 'https://www.instagram.com/graphql/query');
+define('USER_AGENT', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36');
 
 $options = getopt('u:c:', ['username:', 'cookie:']);
 $username = $options['u'] ?? $options['username'] ?? null;
@@ -25,7 +20,6 @@ define('API_COOKIE', $cookie);
 
 define('USER_DIR', __DIR__ . '/' . $username);
 
-$userId = getUserId($username);
 if (!file_exists(USER_DIR)) {
     mkdir(USER_DIR);
 }
@@ -42,25 +36,18 @@ $posts = [];
 $maxId = '';
 echo '0 posts done';
 while ($maxId !== null) {
-    $json = getPosts($userId, 50, $maxId);
+    $json = getPosts($username, 50, $maxId);
 
     $breakFlag = false;
 
-    $edges = $json['data']['user']['edge_owner_to_timeline_media']['edges'];
-    foreach ($edges as $edge) {
-        if ($lastShortcode === $edge['node']['shortcode']) {
+    $xdt = $json['data']['xdt_api__v1__feed__user_timeline_graphql_connection'];
+    foreach ($xdt['edges'] as $edge) {
+        $post = convertPost($edge['node']);
+        if ($lastShortcode === $post['shortcode']) {
             $breakFlag = true;
             break;
         }
-        $post = [
-            'typename' => $edge['node']['__typename'],
-            'text' => $edge['node']['edge_media_to_caption']['edges']['0']['node']['text'],
-            'shortcode' => $edge['node']['shortcode'],
-            'display_url' => $edge['node']['display_url'],
-            'video_url' => $edge['node']['video_url'] ?? null,
-            'sidecar_edges' => $edge['node']['edge_sidecar_to_children']['edges'] ?? null,
-            'timestamp' => $edge['node']['taken_at_timestamp']
-        ];
+
         switch ($post['typename']) {
             case 'GraphImage':
             case 'GraphVideo':
@@ -85,9 +72,9 @@ while ($maxId !== null) {
         break;
     }
 
-    $hasNextPage = $json['data']['user']['edge_owner_to_timeline_media']['page_info']['has_next_page'];
+    $hasNextPage = $xdt['page_info']['has_next_page'];
     if ($hasNextPage) {
-        $maxId = $json['data']['user']['edge_owner_to_timeline_media']['page_info']['end_cursor'];
+        $maxId = $xdt['page_info']['end_cursor'];
     } else {
         $maxId = null;
     }
@@ -105,29 +92,91 @@ foreach ($posts as $post) {
 }
 echo "\nFinished!\n";
 
-
-
-function getUserId(string $username): int
+function convertType(int $mediaType): string
 {
-    $url = API_PROFILE_URL . '?' . http_build_query(['username' => $username]);
-    $response = requestApi($url);
-    $json = json_decode($response, true);
-    $userId = $json['data']['user']['id'] ?? null;
-    if ($userId === null || (int)$userId === 0) {
-        echo "Error: Can't get user id.\n";
-        exit(1);
+    switch ($mediaType) {
+        case 1:
+            return 'GraphImage';
+        case 2:
+            return 'GraphVideo';
+        case 8:
+            return 'GraphSidecar';
+        default:
+            throw new Exception("Unknown media type: {$mediaType}");
     }
-    return (int)$userId;
 }
 
-function getPosts(int $id, int $count, string $maxId): array
+function getHiResImageUrl(array $candidates): string
+{
+    $resolutions = array_map(function ($c) {
+        return [
+            'url' => $c['url'],
+            'resolution' => $c['width'] * $c['height'],
+        ];
+    }, $candidates);
+    usort($resolutions, fn($a, $b) => $b['resolution'] - $a['resolution']);
+    return $resolutions[0]['url'];
+}
+
+function getHiResVideoUrl(?array $videoVersions): ?string
+{
+    return $videoVersions ? getHiResImageUrl($videoVersions) : null;
+}
+
+function convertGraphSidecar(?array $carouselMedias): array
+{
+    if ($carouselMedias === null) {
+        return [];
+    }
+    return array_map(function ($media) {
+        switch ($media['media_type']) {
+            case 1:
+                return [
+                    'is_video' => false,
+                    'url' => getHiResImageUrl($media['image_versions2']['candidates'])
+                ];
+            case 2:
+                return [
+                    'is_video' => true,
+                    'url' => getHiResVideoUrl($media['video_versions'])
+                ];
+            default:
+                throw new Exception("Unknown media type: {$media['media_type']}");
+        }
+    }, $carouselMedias);
+}
+
+function convertPost(array $node): array
+{
+    return [
+        'typename' => convertType($node['media_type']),
+        'text' => $node['caption']['text'],
+        'shortcode' => $node['code'],
+        'image_url' => getHiResImageUrl($node['image_versions2']['candidates']),
+        'video_url' => getHiResVideoUrl($node['video_versions']),
+        'carousel_medias' => convertGraphSidecar($node['carousel_media']),
+        'timestamp' => $node['taken_at'],
+    ];
+}
+
+function getPosts(string $username, int $count, string $maxId): array
 {
     $params = http_build_query([
-        'doc_id' => API_QUERY_POST_DOC_ID,
+        'doc_id' => '8363144743749214',
         'variables' => json_encode([
-            'id' => (string)$id,
-            'first' => (string)$count,
-            'after' => (string)$maxId
+            'username' => $username,
+            'first' => $count,
+            'after' => $maxId,
+            'before' => null,
+            'last' => null,
+            'data' => [
+                'count' => $count,
+                "include_relationship_info" => true,
+                "latest_besties_reel_media" => true,
+                "latest_reel_media" => true,
+            ],
+            '__relay_internal__pv__PolarisIsLoggedInrelayprovider' => true,
+            '__relay_internal__pv__PolarisFeedShareMenurelayprovider' => false,
         ])
     ]);
     $url = API_QUERY_URL . '?' . $params;
@@ -135,10 +184,16 @@ function getPosts(int $id, int $count, string $maxId): array
     return json_decode($content, true);
 }
 
+
+function getPostDate(array $post): string
+{
+    return date('Y-m-d H.i.s', $post['timestamp']);
+}
+
 function saveGraphImageOrVideo(array $post): array
 {
     $isVideo = $post['video_url'] !== null;
-    $url = $isVideo ? $post['video_url'] : $post['display_url'];
+    $url = $isVideo ? $post['video_url'] : $post['image_url'];
     $fileName = getPostDate($post);
     $savePath = USER_DIR . '/' . $fileName;
     $fileExt = saveMediaFile($url, $savePath);
@@ -150,12 +205,11 @@ function saveGraphSidecar(array $post): array
 {
     $imageCount = 1;
     $imageNames = [];
-    foreach ($post['sidecar_edges'] as $edge) {
+    foreach ($post['carousel_medias'] as $m) {
         $fileName = getPostDate($post) . '-' . $imageCount++;
         $savePath = USER_DIR . '/' . $fileName;
 
-        $urlKey = $edge['node']['is_video'] ? 'video_url' : 'display_url';
-        $fileExt = saveMediaFile($edge['node'][$urlKey], $savePath);
+        $fileExt = saveMediaFile($m['url'], $savePath);
         $imageNames[] = $fileName . '.' . $fileExt;
     }
     $post['medias'] = implode(',', $imageNames);
@@ -168,7 +222,6 @@ function requestApi(string $url): string
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_FAILONERROR, true);
     curl_setopt($ch, CURLOPT_USERAGENT, USER_AGENT);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, API_HTTP_HEADERS);
     if (API_COOKIE !== null) {
         curl_setopt($ch, CURLOPT_COOKIE, API_COOKIE);
     }
@@ -206,9 +259,4 @@ function saveMediaFile(string $url, string $savePath): string
 
     rename($savePath, $savePath . '.' . $ext);
     return $ext;
-}
-
-function getPostDate(array $post): string
-{
-    return date('Y-m-d H.i.s', $post['timestamp']);
 }
