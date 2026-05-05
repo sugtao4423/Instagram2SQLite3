@@ -28,8 +28,8 @@ $dbPath = __DIR__ . "/{$username}.db";
 $pdo = new PDO('sqlite:' . $dbPath);
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $pdo->exec("CREATE TABLE IF NOT EXISTS '{$username}' (typename TEXT, text TEXT, shortcode TEXT, medias TEXT, timestamp INTEGER UNIQUE)");
-$lastShortcode = $pdo
-    ->query("SELECT shortcode from '{$username}' ORDER BY timestamp DESC LIMIT 1")
+$lastTimestamp = $pdo
+    ->query("SELECT timestamp from '{$username}' ORDER BY timestamp DESC LIMIT 1")
     ->fetch(PDO::FETCH_NUM)[0] ?? null;
 
 $posts = [];
@@ -43,7 +43,7 @@ while ($maxId !== null) {
     $xdt = $json['data']['xdt_api__v1__feed__user_timeline_graphql_connection'];
     foreach ($xdt['edges'] as $edge) {
         $post = convertPost($edge['node']);
-        if ($lastShortcode === $post['shortcode']) {
+        if ($lastTimestamp !== null && $post['timestamp'] <= $lastTimestamp) {
             $breakFlag = true;
             break;
         }
