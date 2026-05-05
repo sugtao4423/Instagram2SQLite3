@@ -5,7 +5,7 @@ date_default_timezone_set('Asia/Tokyo');
 
 define('API_PROFILE_URL', 'https://www.instagram.com/api/v1/users/web_profile_info/');
 define('API_QUERY_URL', 'https://www.instagram.com/graphql/query');
-define('USER_AGENT', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36');
+define('USER_AGENT', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36');
 
 $options = getopt('u:c:', ['username:', 'cookie:']);
 $username = $options['u'] ?? $options['username'] ?? null;
