@@ -216,6 +216,20 @@ function saveGraphSidecar(array $post): array
     return $post;
 }
 
+function retryCurl(CurlHandle $ch, int $maxRetries, int $delayMilliseconds): string|bool
+{
+    $response = false;
+    for ($i = 0; $i < $maxRetries; $i++) {
+        usleep($delayMilliseconds * 1000);
+        $response = curl_exec($ch);
+        if ($response !== false) {
+            return $response;
+        }
+    }
+    $url = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+    throw new Exception("Failed to fetch URL after {$maxRetries} attempts: {$url}");
+}
+
 function requestApi(string $url): string
 {
     $ch = curl_init($url);
@@ -225,10 +239,7 @@ function requestApi(string $url): string
     if (API_COOKIE !== null) {
         curl_setopt($ch, CURLOPT_COOKIE, API_COOKIE);
     }
-    do {
-        sleep(1);
-        $response = curl_exec($ch);
-    } while ($response === false);
+    $response = retryCurl($ch, 5, 1000);
     return $response;
 }
 
@@ -246,10 +257,8 @@ function saveMediaFile(string $url, string $savePath): string
     curl_setopt($ch, CURLOPT_USERAGENT, USER_AGENT);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
     curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
-    do {
-        usleep(200 * 1000);
-        $result = curl_exec($ch);
-    } while ($result === false);
+    retryCurl($ch, 5, 200);
+
     $mimeType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
     $ext = preg_replace('/^(image|video)\//', '', $mimeType);
     $ext = str_replace('jpeg', 'jpg', $ext);
