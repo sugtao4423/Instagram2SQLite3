@@ -229,7 +229,6 @@ function requestApi(string $url): string
         sleep(1);
         $response = curl_exec($ch);
     } while ($response === false);
-    curl_close($ch);
     return $response;
 }
 
@@ -255,7 +254,6 @@ function saveMediaFile(string $url, string $savePath): string
     $ext = preg_replace('/^(image|video)\//', '', $mimeType);
     $ext = str_replace('jpeg', 'jpg', $ext);
     fclose($fp);
-    curl_close($ch);
 
     rename($savePath, $savePath . '.' . $ext);
     return $ext;
